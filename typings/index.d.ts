@@ -274,15 +274,15 @@ declare namespace commander {
     description(): string;
 
     /**
+     * Get alias for the command.
+     */
+    alias(): string;
+    /**
      * Set an alias for the command.
      * 
      * @returns Command for chaining
      */
-    alias(alias: string): this;
-    /**
-     * Get alias for the command.
-     */
-    alias(): string;
+    alias(...aliases: string[]): this;
 
     /**
      * Set the command usage.
@@ -327,8 +327,9 @@ declare namespace commander {
 
     /** 
      * Output help information and exit.
+     * When `noExit` is marked then it doesn't exit.
      */
-    help(cb?: (str: string) => string): never;
+    help(cb?: (str: string) => string, noExit?: boolean): never;
 
     /**
      * Add a listener (callback) for when events occur. (Implemented using EventEmitter.)

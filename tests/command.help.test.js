@@ -1,5 +1,8 @@
 const commander = require('../');
 
+const chalk = require('chalk');
+chalk.level = 0;
+
 // Testing various help incantations.
 //
 // Note there are also specific help tests included in many of the feature tests,
@@ -11,14 +14,18 @@ test('when call helpInformation for program then help format is as expected (usa
   program
     .command('my-command <file>');
   const expectedHelpInformation =
-`Usage: test [options] [command]
+`
+Usage: test [options] [command]
 
 Options:
-  -h, --help         display help for command
+
+  -h, --help         Outputs usage information.
 
 Commands:
+
   my-command <file>
-  help [command]     display help for command
+  help [command]     Outputs usage information.
+
 `;
 
   program.name('test');

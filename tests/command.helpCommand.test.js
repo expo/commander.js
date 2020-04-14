@@ -1,5 +1,8 @@
 const commander = require('../');
 
+const chalk = require('chalk');
+chalk.level = 0;
+
 describe('help command listed in helpInformation', () => {
   test('when program has no subcommands then no automatic help command', () => {
     const program = new commander.Command();

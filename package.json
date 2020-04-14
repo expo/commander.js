@@ -1,5 +1,5 @@
 {
-  "name": "commander",
+  "name": "@expo/commander",
   "version": "5.0.0",
   "description": "the complete solution for node.js command-line programs",
   "keywords": [
@@ -29,7 +29,11 @@
     "index.js",
     "typings/index.d.ts"
   ],
-  "dependencies": {},
+  "dependencies": {
+    "ansi-regex": "5.0.0",
+    "chalk": "^3.0.0",
+    "strip-ansi": "6.0.0"
+  },
   "devDependencies": {
     "@types/jest": "^25.1.4",
     "@types/node": "^12.12.26",

@@ -1,11 +1,12 @@
-/**
- * Module dependencies.
- */
+'use strict';
 
-const EventEmitter = require('events').EventEmitter;
-const spawn = require('child_process').spawn;
+const { spawn } = require('child_process');
+const { EventEmitter } = require('events');
 const path = require('path');
 const fs = require('fs');
+const chalk = require('chalk');
+const ansiRegex = require('ansi-regex');
+const stripAnsi = require('strip-ansi');
 
 // @ts-check
 
@@ -118,16 +119,17 @@ class Command extends EventEmitter {
     this._defaultCommandName = null;
     this._exitCallback = null;
     this._alias = null;
+    this._aliases = null;
 
     this._noHelp = false;
     this._helpFlags = '-h, --help';
-    this._helpDescription = 'display help for command';
+    this._helpDescription = 'Outputs usage information.';
     this._helpShortFlag = '-h';
     this._helpLongFlag = '--help';
     this._hasImplicitHelpCommand = undefined; // Deliberately undefined, not decided whether true or false
     this._helpCommandName = 'help';
     this._helpCommandnameAndArgs = 'help [command]';
-    this._helpCommandDescription = 'display help for command';
+    this._helpCommandDescription = this._helpDescription;
   }
 
   /**
@@ -1086,6 +1088,17 @@ class Command extends EventEmitter {
   };
 
   /**
+   * Logs given `message` and additional help.
+   * @param {string} message
+   * @api private
+   */
+
+  logError(message) {
+    console.error(chalk.red(`\n${optionalWrap(`  ${message}`, process.stdout.columns || 80, 2)}`));
+    this.help(undefined, true);
+  }
+
+  /**
    * Argument `name` is missing.
    *
    * @param {string} name
@@ -1093,9 +1106,8 @@ class Command extends EventEmitter {
    */
 
   missingArgument(name) {
-    const message = `error: missing required argument '${name}'`;
-    console.error(message);
-    this._exit(1, 'commander.missingArgument', message);
+    this.logError(`Missing required argument ${chalk.yellow(name)} for command ${chalk.green(this._name)}. See below for the correct usage of this command.`);
+    this._exit(1, 'commander.missingArgument', `error: missing required argument '${name}'`);
   };
 
   /**
@@ -1107,14 +1119,8 @@ class Command extends EventEmitter {
    */
 
   optionMissingArgument(option, flag) {
-    let message;
-    if (flag) {
-      message = `error: option '${option.flags}' argument missing, got '${flag}'`;
-    } else {
-      message = `error: option '${option.flags}' argument missing`;
-    }
-    console.error(message);
-    this._exit(1, 'commander.optionMissingArgument', message);
+    this.logError(`Option ${chalk.yellow(option.flags)} argument missing${flag ? ` (got ${chalk.yellow(flag)})` : ''} for command ${chalk.green(this._name)}. See below for the full list of options.`);
+    this._exit(1, 'commander.optionMissingArgument', `error: option '${option.flags}' argument missing${flag ? `, got '${flag}'` : ''}`);
   };
 
   /**
@@ -1125,9 +1131,8 @@ class Command extends EventEmitter {
    */
 
   missingMandatoryOptionValue(option) {
-    const message = `error: required option '${option.flags}' not specified`;
-    console.error(message);
-    this._exit(1, 'commander.missingMandatoryOptionValue', message);
+    this.logError(`Required option ${chalk.yellow(option.flags)} for command ${chalk.green(this._name)} not specified. See below for the full list of options.`);
+    this._exit(1, 'commander.missingMandatoryOptionValue', `error: required option '${option.flags}' not specified`);
   };
 
   /**
@@ -1139,9 +1144,8 @@ class Command extends EventEmitter {
 
   unknownOption(flag) {
     if (this._allowUnknownOption) return;
-    const message = `error: unknown option '${flag}'`;
-    console.error(message);
-    this._exit(1, 'commander.unknownOption', message);
+    this.logError(`Unknown option ${chalk.yellow(flag)} for command ${chalk.green(this._name)}. See below for the full list of options.`);
+    this._exit(1, 'commander.unknownOption', `error: unknown option '${flag}'`);
   };
 
   /**
@@ -1156,9 +1160,9 @@ class Command extends EventEmitter {
       partCommands.unshift(parentCmd.name());
     }
     const fullCommand = partCommands.join(' ');
-    const message = `error: unknown command '${this.args[0]}'. See '${fullCommand} ${this._helpLongFlag}'.`;
-    console.error(message);
-    this._exit(1, 'commander.unknownCommand', message);
+
+    this.logError(`Unknown command ${chalk.yellow(this.args[0])}. See below for the full list of command.`);
+    this._exit(1, 'commander.unknownCommand', `error: unknown command '${this.args[0]}'. See '${fullCommand} ${this._helpLongFlag}'.`);
   };
 
   /**
@@ -1210,22 +1214,27 @@ class Command extends EventEmitter {
   /**
    * Set an alias for the command
    *
-   * @param {string} alias
+   * @param {...string} alias
    * @return {String|Command}
    * @api public
    */
 
-  alias(alias) {
+  alias(...aliases) {
     let command = this;
     if (this.commands.length !== 0) {
       command = this.commands[this.commands.length - 1];
     }
 
-    if (arguments.length === 0) return command._alias;
+    if (aliases.length === 0) {
+      return command._alias;
+    }
 
-    if (alias === command._name) throw new Error('Command alias can\'t be the same as its name');
+    if (aliases.includes(command._name)) {
+      throw new Error('Command alias can\'t be the same as its name');
+    }
 
-    command._alias = alias;
+    command._alias = aliases[0];
+    command._aliases = aliases;
     return this;
   };
 
@@ -1242,9 +1251,7 @@ class Command extends EventEmitter {
       return humanReadableArgName(arg);
     });
 
-    const usage = '[options]' +
-      (this.commands.length ? ' [command]' : '') +
-      (this._args.length ? ' ' + args.join(' ') : '');
+    const usage = `[${chalk.yellow('options')}]${(this.commands.length ? ` [${chalk.italic.green('command')}]` : '')}${(this._args.length ? ' ' + args.join(' ') : '')}`;
 
     if (arguments.length === 0) return this._usage || usage;
     this._usage = str;
@@ -1281,17 +1288,24 @@ class Command extends EventEmitter {
         return humanReadableArgName(arg);
       }).join(' ');
 
-      return [
-        cmd._name +
-          (cmd._alias ? '|' + cmd._alias : '') +
-          (cmd.options.length ? ' [options]' : '') +
+      const result = [
+        chalk.bold.green(cmd._name) +
+          (cmd._aliases ? chalk.gray(' | ') + cmd._aliases.map(alias => chalk.italic.green(alias)).join(chalk.gray(' | ')) : '') +
+          (cmd.options.length ? chalk.gray(' [options]') : '') +
           (args ? ' ' + args : ''),
-        cmd._description
+        cmd._description && chalk.yellow(cmd._description)
       ];
+      return result;
     });
 
     if (this._lazyHasImplicitHelpCommand()) {
-      commandDetails.push([this._helpCommandnameAndArgs, this._helpCommandDescription]);
+      const helpCommand = [
+        chalk.bold.green(this._helpCommandnameAndArgs
+          .replace(/(\[)(command)(\])/, `${chalk.reset.gray(`$1${chalk.redBright('$2')}$3`)}`)
+        ),
+        chalk.yellow(this._helpCommandDescription)
+      ];
+      commandDetails.push(helpCommand);
     }
     return commandDetails;
   };
@@ -1305,9 +1319,11 @@ class Command extends EventEmitter {
 
   largestCommandLength() {
     const commands = this.prepareCommands();
-    return commands.reduce((max, command) => {
-      return Math.max(max, command[0].length);
-    }, 0);
+    return commands
+      .map(([command, commandDesc]) => stripAnsi(command))
+      .reduce((max, command) => {
+        return Math.max(max, command.length);
+      }, 0);
   };
 
   /**
@@ -1379,12 +1395,17 @@ class Command extends EventEmitter {
     const descriptionWidth = columns - width - 4;
 
     // Append the help information
-    return this.options.map((option) => {
-      const fullDesc = option.description +
-        ((!option.negate && option.defaultValue !== undefined) ? ' (default: ' + JSON.stringify(option.defaultValue) + ')' : '');
-      return pad(option.flags, width) + '  ' + optionalWrap(fullDesc, descriptionWidth, width + 2);
-    }).concat([pad(this._helpFlags, width) + '  ' + optionalWrap(this._helpDescription, descriptionWidth, width + 2)])
-      .join('\n');
+    const result = this.options.map((option) => {
+      const flags = transformOptionFlags(option.flags);
+
+      const defaultStr = (!option.negate && option.defaultValue !== undefined) ? `${chalk.gray('(default: ')}${chalk.blueBright(JSON.stringify(option.defaultValue))}${chalk.gray(')')} ` : '';
+      const description = chalk.yellow(`${defaultStr}${option.description}`);
+      const optionString = pad(flags, width);
+
+      return optionString + '  ' + optionalWrap(description, descriptionWidth, width + 2);
+    });
+    const helpOption = [pad(transformOptionFlags(this._helpFlags), width) + '  ' + optionalWrap(chalk.yellow(this._helpDescription), descriptionWidth, width + 2)];
+    return result.concat(helpOption).join('\n');
   };
 
   /**
@@ -1403,12 +1424,18 @@ class Command extends EventEmitter {
     const columns = process.stdout.columns || 80;
     const descriptionWidth = columns - width - 4;
 
+    const commandsLines = commands
+      .map((cmd) => {
+        if (cmd[1]) {
+          return pad(cmd[0], width) + '  ' + optionalWrap(cmd[1], descriptionWidth, width + 2);
+        }
+        return cmd[0];
+      });
+
     return [
-      'Commands:',
-      commands.map((cmd) => {
-        const desc = cmd[1] ? '  ' + cmd[1] : '';
-        return (desc ? pad(cmd[0], width) : cmd[0]) + optionalWrap(desc, descriptionWidth, width + 2);
-      }).join('\n').replace(/^/gm, '  '),
+      chalk.bold.yellow('Commands:'),
+      '',
+      commandsLines.join('\n').replace(/^/gm, '  '),
       ''
     ].join('\n');
   };
@@ -1423,35 +1450,40 @@ class Command extends EventEmitter {
   helpInformation() {
     let desc = [];
     if (this._description) {
+      const columns = process.stdout.columns || 80;
       desc = [
-        this._description,
+        chalk.bold.yellow('Description: '),
+        '',
+        optionalWrap(`  ${chalk.yellow(this._description)}`, columns, 2),
         ''
       ];
 
       const argsDescription = this._argsDescription;
       if (argsDescription && this._args.length) {
         const width = this.padWidth();
-        const columns = process.stdout.columns || 80;
-        const descriptionWidth = columns - width - 5;
-        desc.push('Arguments:');
+        const descriptionWidth = columns - width - 4;
+        desc.push(chalk.bold.yellow('Arguments:'));
         desc.push('');
         this._args.forEach((arg) => {
-          desc.push('  ' + pad(arg.name, width) + '  ' + wrap(argsDescription[arg.name], descriptionWidth, width + 4));
+          const requiredString = arg.required ? chalk.gray(`(${chalk.redBright('required')}) `) : '';
+          desc.push(`  ${pad(chalk.magenta(arg.name), width)}  ${optionalWrap(`${requiredString}${chalk.yellow(argsDescription[arg.name])}`, descriptionWidth, width + 4)}`);
         });
         desc.push('');
       }
     }
 
-    let cmdName = this._name;
-    if (this._alias) {
-      cmdName = cmdName + '|' + this._alias;
+    let cmdName = chalk.bold.green(this._name);
+    if (this._aliases) {
+      const separator = chalk.gray(' | ');
+      cmdName = cmdName + separator + this._aliases.map(alias => chalk.italic.green(alias)).join(separator);
     }
     let parentCmdNames = '';
     for (let parentCmd = this.parent; parentCmd; parentCmd = parentCmd.parent) {
       parentCmdNames = parentCmd.name() + ' ' + parentCmdNames;
     }
     const usage = [
-      'Usage: ' + parentCmdNames + cmdName + ' ' + this.usage(),
+      '',
+      chalk.bold.yellow('Usage: ') + chalk.italic.green(parentCmdNames) + cmdName + ' ' + this.usage(),
       ''
     ];
 
@@ -1460,7 +1492,8 @@ class Command extends EventEmitter {
     if (commandHelp) cmds = [commandHelp];
 
     const options = [
-      'Options:',
+      chalk.bold.yellow('Options:'),
+      '',
       '' + this.optionHelp().replace(/^/gm, '  '),
       ''
     ];
@@ -1469,6 +1502,7 @@ class Command extends EventEmitter {
       .concat(desc)
       .concat(options)
       .concat(cmds)
+      .concat([''])
       .join('\n');
   };
 
@@ -1522,14 +1556,17 @@ class Command extends EventEmitter {
    * Output help information and exit.
    *
    * @param {Function} [cb]
+   * @param {boolean} [noExit] Whether to exit program upon logging error.
    * @api public
    */
 
-  help(cb) {
+  help(cb, noExit = false) {
     this.outputHelp(cb);
     // exitCode: preserving original behaviour which was calling process.exit()
     // message: do not have all displayed text available so only passing placeholder.
-    this._exit(process.exitCode || 0, 'commander.help', '(outputHelp)');
+    if (!noExit) {
+      this._exit(process.exitCode || 0, 'commander.help', '(outputHelp)');
+    }
   };
 
   /**
@@ -1561,6 +1598,17 @@ exports.Option = Option;
 exports.CommanderError = CommanderError;
 
 /**
+ * Transforms option flags into colored output.
+ *
+ * @param {String} flags
+ */
+function transformOptionFlags(flags) {
+  return flags
+    .replace(/(?<=^|, ?)(-{1,2}\w[\w-]*)/g, `${chalk.magenta('$1')}`)
+    .replace(/(<(\w|-)+>|\[(\w|-)+\])/g, `${chalk.cyan('$1')}`);
+}
+
+/**
  * Camel-case the given `flag`
  *
  * @param {string} flag
@@ -1577,6 +1625,8 @@ function camelcase(flag) {
 /**
  * Pad `str` to `width`.
  *
+ * @note `str.length` is calculated on `str` with stripped ANSI style codes.
+ *
  * @param {string} str
  * @param {number} width
  * @return {string}
@@ -1584,13 +1634,16 @@ function camelcase(flag) {
  */
 
 function pad(str, width) {
-  const len = Math.max(0, width - str.length);
+  const stripAnsiStr = stripAnsi(str);
+  const len = Math.max(0, width - stripAnsiStr.length);
   return str + Array(len + 1).join(' ');
 }
 
 /**
  * Wraps the given string with line breaks at the specified width while breaking
  * words and indenting every but the first line on the left.
+ *
+ * @note `str` is stripped from any ANSI style codes before splitting. ANSI style codes are reinserted again after line wrapping process at correct indices.
  *
  * @param {string} str
  * @param {number} width
@@ -1599,14 +1652,51 @@ function pad(str, width) {
  * @api private
  */
 function wrap(str, width, indent) {
-  const regex = new RegExp('.{1,' + (width - 1) + '}([\\s\u200B]|$)|[^\\s\u200B]+?([\\s\u200B]|$)', 'g');
-  const lines = str.match(regex) || [];
-  return lines.map((line, i) => {
-    if (line.slice(-1) === '\n') {
-      line = line.slice(0, line.length - 1);
+  // given string with ANSI style codes, we need get rid of them for wrapping process, but we also need to restore them at correct indices in wrapped lines.
+  const ansiRegexOnce = ansiRegex({ onlyFirst: true });
+
+  let strippedStr = str;
+  let ansiMatch;
+  // keeps tuples with relation: [<index to be inserted at as if this ANSI style was the first in the string>, <ANSI style string>]
+  const stylesToBeRestored = [];
+  while ((ansiMatch = strippedStr.match(ansiRegexOnce))) {
+    stylesToBeRestored.push([ansiMatch.index, ansiMatch[0]]);
+    strippedStr = strippedStr.replace(ansiRegexOnce, '');
+  }
+
+  const regex = new RegExp(`.{1,${width - 1}}([\\s\u200B]|$)|[^\\s\u200B]+?([\\s\u200B]|$)`, 'g');
+  const strippedLines = strippedStr.match(regex) || [];
+
+  let processedStrippedStrLength = 0;
+  const result = strippedLines.map((strippedLine, lineIdx) => {
+    const strippedLineLength = strippedLine.length;
+
+    // last character equals '\n'
+    if (strippedLine.slice(-1) === '\n') {
+      strippedLine = strippedLine.slice(0, strippedLine.length - 1);
     }
-    return ((i > 0 && indent) ? Array(indent + 1).join(' ') : '') + line.trimRight();
+    strippedLine = strippedLine.trimRight();
+
+    let { resultLine, fromIdx } = stylesToBeRestored
+      .filter(([idx]) => idx >= processedStrippedStrLength && idx < processedStrippedStrLength + strippedLineLength)
+      .reduce(({ resultLine, fromIdx }, [ANSIStyleInsertIdx, ANSIStyle]) => {
+        const insertIdx = ANSIStyleInsertIdx - processedStrippedStrLength;
+        return {
+          resultLine: resultLine + strippedLine.substring(fromIdx, insertIdx) + ANSIStyle,
+          fromIdx: insertIdx
+        };
+      }, { resultLine: '', fromIdx: 0 });
+
+    resultLine += strippedLine.substring(fromIdx); // add rest of the string
+
+    processedStrippedStrLength += strippedLine.length;
+    return (lineIdx > 0 ? ' '.repeat(indent) : '') + resultLine;
   }).join('\n');
+
+  const resultStrWithReinsertedANSIStyled = stylesToBeRestored
+    .filter(([idx]) => idx >= processedStrippedStrLength)
+    .reduce((acc, [_, ANSIStyle]) => acc + ANSIStyle, result);
+  return resultStrWithReinsertedANSIStyled;
 }
 
 /**
@@ -1659,9 +1749,9 @@ function outputHelpIfRequested(cmd, args) {
 function humanReadableArgName(arg) {
   const nameOutput = arg.name + (arg.variadic === true ? '...' : '');
 
-  return arg.required
-    ? '<' + nameOutput + '>'
-    : '[' + nameOutput + ']';
+  return chalk.gray(arg.required
+    ? '<' + chalk.redBright(nameOutput) + '>'
+    : '[' + chalk.redBright(nameOutput) + ']');
 }
 
 /**

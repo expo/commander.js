@@ -1,5 +1,8 @@
 const commander = require('../');
 
+const chalk = require('chalk');
+chalk.level = 0;
+
 test('when set program name and parse then name is as assigned', () => {
   const program = new commander.Command();
   program.name('custom');
@@ -24,5 +27,5 @@ test('when set program name then name appears in help', () => {
   const program = new commander.Command();
   program.name('custom-name');
   const helpInformation = program.helpInformation();
-  expect(helpInformation).toMatch(/^Usage: custom-name/);
+  expect(helpInformation).toMatch(/\n^Usage: custom-name/m);
 });

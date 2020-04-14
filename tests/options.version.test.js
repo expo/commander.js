@@ -1,5 +1,8 @@
 const commander = require('../');
 
+const chalk = require('chalk');
+chalk.level = 0;
+
 // Test .version. Using exitOverride to check behaviour (instead of mocking process.exit).
 
 describe('.version', () => {

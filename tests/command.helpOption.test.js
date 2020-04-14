@@ -1,5 +1,8 @@
 const commander = require('../');
 
+const chalk = require('chalk');
+chalk.level = 0;
+
 test('when helpOption has custom flags then custom flag invokes help', () => {
   // Optional. Suppress normal output to keep test output clean.
   const writeSpy = jest.spyOn(process.stdout, 'write').mockImplementation(() => { });

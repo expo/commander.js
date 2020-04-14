@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 <!-- markdownlint-disable MD024 -->
 
+## [Introduced in this fork of original repository]
+
+### Added
+
+* support for multiple aliases per command
+* `chalk` to color output
+
+### Changed
+
+* how output is printed - pretty print help and errors information
+
 ## [5.0.0] (2020-03-14)
 
 ### Added

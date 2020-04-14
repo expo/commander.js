@@ -1,5 +1,8 @@
 const commander = require('../');
 
+const chalk = require('chalk');
+chalk.level = 0;
+
 // Test auto wrap and indent with some manual strings.
 // Fragile tests with complete help output.
 
@@ -11,16 +14,20 @@ test('when long option description then wrap and indent', () => {
     .option('-x -extra-long-option-switch', 'kjsahdkajshkahd kajhsd akhds kashd kajhs dkha dkh aksd ka dkha kdh kasd ka kahs dkh sdkh askdh aksd kashdk ahsd kahs dkha skdh');
 
   const expectedOutput =
-`Usage:  [options]
+`
+Usage:  [options]
 
 Options:
+
   -x -extra-long-option-switch  kjsahdkajshkahd kajhsd akhds kashd kajhs dkha
                                 dkh aksd ka dkha kdh kasd ka kahs dkh sdkh
                                 askdh aksd kashdk ahsd kahs dkha skdh
-  -h, --help                    display help for command
+  -h, --help                    Outputs usage information.
+
 `;
 
-  expect(program.helpInformation()).toBe(expectedOutput);
+  const receivedOutput = program.helpInformation();
+  expect(receivedOutput).toBe(expectedOutput);
   process.stdout.columns = oldColumns;
 });
 
@@ -32,12 +39,15 @@ test('when long option description and default then wrap and indent', () => {
     .option('-x -extra-long-option <value>', 'kjsahdkajshkahd kajhsd akhds', 'aaa bbb ccc ddd eee fff ggg');
 
   const expectedOutput =
-`Usage:  [options]
+`
+Usage:  [options]
 
 Options:
-  -x -extra-long-option <value>  kjsahdkajshkahd kajhsd akhds (default: "aaa
-                                 bbb ccc ddd eee fff ggg")
-  -h, --help                     display help for command
+
+  -x -extra-long-option <value>  (default: "aaa bbb ccc ddd eee fff ggg")
+                                 kjsahdkajshkahd kajhsd akhds
+  -h, --help                     Outputs usage information.
+
 `;
 
   expect(program.helpInformation()).toBe(expectedOutput);
@@ -53,16 +63,20 @@ test('when long command description then wrap and indent', () => {
     .command('alpha', 'Lorem mollit quis dolor ex do eu quis ad insa a commodo esse.');
 
   const expectedOutput =
-`Usage:  [options] [command]
+`
+Usage:  [options] [command]
 
 Options:
+
   -x -extra-long-option-switch  x
-  -h, --help                    display help for command
+  -h, --help                    Outputs usage information.
 
 Commands:
-  alpha                         Lorem mollit quis dolor ex do eu quis ad insa
-                                a commodo esse.
-  help [command]                display help for command
+
+  alpha                         Lorem mollit quis dolor ex do eu quis ad insa a
+                                commodo esse.
+  help [command]                Outputs usage information.
+
 `;
 
   expect(program.helpInformation()).toBe(expectedOutput);
@@ -79,46 +93,54 @@ test('when not enough room then help not wrapped', () => {
     .command('1234567801234567890x', commandDescription);
 
   const expectedOutput =
-`Usage:  [options] [command]
+`
+Usage:  [options] [command]
 
 Options:
-  -h, --help            display help for command
+
+  -h, --help            Outputs usage information.
 
 Commands:
+
   1234567801234567890x  ${commandDescription}
-  help [command]        display help for command
+  help [command]        Outputs usage information.
+
 `;
 
-  expect(program.helpInformation()).toBe(expectedOutput);
+  const receivedOutput = program.helpInformation();
+  expect(receivedOutput).toBe(expectedOutput);
   process.stdout.columns = oldColumns;
 });
 
-test('when option descripton preformatted then only add small indent', () => {
+test('when option description preformatted then only add small indent', () => {
   const oldColumns = process.stdout.columns;
   process.stdout.columns = 80;
   // #396: leave custom format alone, apart from space-space indent
-  const optionSpec = '-t, --time <HH:MM>';
   const program = new commander.Command();
   program
-    .option(optionSpec, `select time
+    .option('-t, --time <HH:MM>', `select time
 
 Time can also be specified using special values:
   "dawn" - From night to sunrise.
 `);
 
   const expectedOutput =
-`Usage:  [options]
+`
+Usage:  [options]
 
 Options:
-  ${optionSpec}  select time
+
+  -t, --time <HH:MM>  select time
   
   Time can also be specified using special values:
     "dawn" - From night to sunrise.
   
-  -h, --help          display help for command
+  -h, --help          Outputs usage information.
+
 `;
 
-  expect(program.helpInformation()).toBe(expectedOutput);
+  const receivedOutput = program.helpInformation();
+  expect(receivedOutput).toBe(expectedOutput);
   process.stdout.columns = oldColumns;
 });
 

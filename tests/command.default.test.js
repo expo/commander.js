@@ -56,3 +56,7 @@ describe('default action command', () => {
     expect(actionMock).toHaveBeenCalled();
   });
 });
+
+describe('complex program', () => {
+
+});
